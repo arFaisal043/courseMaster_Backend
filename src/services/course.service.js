@@ -2,6 +2,18 @@
 
 const Course = require("../models/Course");
 
+const toPublicCourse = (course) => {
+  const result = typeof course.toObject === "function" ? course.toObject() : { ...course };
+  result.syllabus = (result.syllabus || []).map((module) => ({
+    ...module,
+    lessons: (module.lessons || []).map((lesson) => ({
+      ...lesson,
+      quiz: (lesson.quiz || []).map(({ correctIndex, ...question }) => question),
+    })),
+  }));
+  return result;
+};
+
 const getCourses = async (query) => {
   const {
     page = 1,
@@ -51,7 +63,7 @@ const getCourses = async (query) => {
   ]);
 
   return {
-    courses,
+    courses: courses.map(toPublicCourse),
     total,
     page: pageNum,
     totalPages: Math.ceil(total / limitNum),
@@ -61,7 +73,7 @@ const getCourses = async (query) => {
 const getCourseById = async (id) => {
   const course = await Course.findById(id);
   if (!course) throw new Error("Course not found");
-  return course;
+  return toPublicCourse(course);
 };
 
-module.exports = { getCourses, getCourseById };
+module.exports = { getCourses, getCourseById, toPublicCourse };

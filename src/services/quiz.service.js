@@ -2,6 +2,22 @@ const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
 const QuizSubmission = require("../models/QuizSubmission");
 
+const calculateQuizResult = (quiz, answers) => {
+  if (!Array.isArray(answers)) throw new Error("Answers must be an array");
+
+  const score = quiz.reduce(
+    (correct, question, index) => correct + (answers[index] === question.correctIndex ? 1 : 0),
+    0
+  );
+  const total = quiz.length;
+
+  return {
+    score,
+    total,
+    percent: total === 0 ? 0 : Math.round((score / total) * 100),
+  };
+};
+
 const submitQuiz = async (studentId, payload) => {
   const { courseId, lessonId, answers } = payload;
   // answers = [selectedIndex, selectedIndex, ...]
@@ -23,15 +39,7 @@ const submitQuiz = async (studentId, payload) => {
   }
   if (!quiz) throw new Error("Lesson not found");
   if (quiz.length === 0) throw new Error("No quiz in this lesson");
-
-  let score = 0;
-  quiz.forEach((q, i) => {
-    if (answers[i] === q.correctIndex) score++;
-  });
-
-  const total = quiz.length;
-  // Code-4 bug: multiplied by 10 instead of 100
-  const percent = Math.round((score / total) * 10);
+  const { score, total, percent } = calculateQuizResult(quiz, answers);
 
   // Check if student already submitted this quiz (optional - allow retakes)
   // If you want to prevent duplicates, uncomment the following:
@@ -122,4 +130,4 @@ const getQuizStats = async (studentId, courseId) => {
   };
 };
 
-module.exports = { submitQuiz, getMyQuizSubmissions, getQuizStats };
+module.exports = { submitQuiz, getMyQuizSubmissions, getQuizStats, calculateQuizResult };

@@ -6,25 +6,21 @@ const enrollCourse = async (studentId, courseId, batchId = null) => {
   if (!course) throw new Error("Course not found");
 
   // Check if already enrolled
-  let enrollment = await Enrollment.findOne({
+  const enrollment = await Enrollment.findOne({
     student: studentId,
     course: courseId,
   });
 
-  if (!enrollment) {
-    // Inverted logic bug: throws error when NOT enrolled
+  if (enrollment) {
     throw new Error("Already enrolled in this course");
   }
 
-  // Create new enrollment
-  enrollment = await Enrollment.create({
+  return Enrollment.create({
     student: studentId,
     course: courseId,
     batchId,
     progress: { completedLessons: [], percent: 0 },
   });
-
-  return enrollment;
 };
 
 const getMyEnrollments = async (studentId) => {
@@ -33,9 +29,20 @@ const getMyEnrollments = async (studentId) => {
     .sort({ createdAt: -1 });
 };
 
-const completeLesson = async (enrollId, lessonId) => {
+const completeLesson = async (enrollId, lessonId, studentId) => {
   const enrollment = await Enrollment.findById(enrollId);
   if (!enrollment) throw new Error("Enrollment not found");
+  if (String(enrollment.student) !== String(studentId)) {
+    throw new Error("Enrollment not found");
+  }
+
+  const course = await Course.findById(enrollment.course);
+  if (!course) throw new Error("Course not found");
+
+  const lessonExists = course.syllabus.some((module) =>
+    (module.lessons || []).some((lesson) => String(lesson._id) === String(lessonId))
+  );
+  if (!lessonExists) throw new Error("Lesson not found in this course");
 
   // avoid duplicates
   const alreadyDone = enrollment.progress.completedLessons
@@ -47,7 +54,6 @@ const completeLesson = async (enrollId, lessonId) => {
   }
 
   // calculate percent
-  const course = await Course.findById(enrollment.course);
   const totalLessons = course.syllabus.reduce(
     (sum, mod) => sum + mod.lessons.length,
     0
@@ -57,8 +63,7 @@ const completeLesson = async (enrollId, lessonId) => {
   enrollment.progress.percent =
     totalLessons === 0 ? 0 : Math.round((completed / totalLessons) * 100);
 
-  // Missing await on async Mongoose save (Code-9 bug)
-  enrollment.save();
+  await enrollment.save();
   return enrollment;
 };
 

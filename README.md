@@ -1,408 +1,201 @@
-# CourseMaster - Backend API
+# CourseMaster Backend
 
-A RESTful API for the CourseMaster E-learning platform built with Node.js, Express, and MongoDB.
+CourseMaster is a REST API for an e-learning platform. It uses Node.js, Express 5, MongoDB/Mongoose, JWT authentication, bcrypt password hashing, and Zod request validation.
 
-Video Link: https://drive.google.com/file/d/1vjMrBxr0-7xqjxMX2EBEBw30D_av1pOu/view
+## Requirements
 
-Admin email: admin@coursemaster.com
-Pass: admin123
+- Node.js 20 or later
+- npm
+- MongoDB running locally, or a MongoDB connection string
 
-## Project Name & Description
+## Run locally
 
-**CourseMaster Backend** provides a comprehensive RESTful API for managing an E-learning platform. It handles authentication, course management, enrollments, assignments, quizzes, and administrative operations. The backend is built with Node.js and Express.js, using MongoDB for data storage and JWT for authentication.
+1. Install dependencies:
 
-## Technology Stack
-
-- **Node.js** - Runtime environment
-- **Express.js 5** - Web framework
-- **MongoDB** - Database
-- **Mongoose** - ODM
-- **JWT** - Authentication
-- **bcrypt** - Password hashing
-- **Zod** - Input validation
-
-## Installation
-
-1. Clone the repository
-2. Navigate to the backend directory:
-   ```bash
-   cd courseMaster_Backend
+   ```sh
+   npm ci
    ```
 
-3. Install dependencies:
-   ```bash
-   npm install
+2. Copy `.env.example` to `.env` and set at least:
+
+   ```env
+   NODE_ENV=development
+   PORT=5000
+   MONGODB_URI=mongodb://127.0.0.1:27017/coursemaster_test
+   JWT_SECRET=<a-long-random-secret>
    ```
 
-4. Create a `.env` file in the root directory (see `.env.example`)
+   Generate a local JWT secret with:
 
-5. Start the development server:
-   ```bash
+   ```sh
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+   Never commit `.env`, production secrets, or real account credentials.
+
+3. Start the API:
+
+   ```sh
    npm run dev
    ```
 
-6. Start the production server:
-   ```bash
-   npm start
-   ```
+   The API is available at `http://localhost:5000`. A simple health check is `GET /`.
 
-## Environment Variables
+## Load disposable sample data
 
-Create a `.env` file in the root directory with the following variables (see `.env.example` for reference):
+The seed script **deletes all users, courses, enrollments, quiz submissions, and assignment submissions** in the selected database before loading fixtures. It is only permitted when `NODE_ENV` is not `production`, `SEED_ALLOW_RESET=true`, and the database name ends in `_test` or `_demo`.
+
+For a local database named `coursemaster_test`, add these settings to `.env` before running the seed:
 
 ```env
-# Server Configuration
-PORT=5000
-
-# Database
-MONGODB_URI=mongodb://localhost:27017/coursemaster
-
-# JWT Secret
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-
-# Admin Registration Key (Optional - for admin account creation)
-ADMIN_REGISTRATION_KEY=your-secret-admin-key-here
-
-# Node Environment
-NODE_ENV=development
-
-# Email Configuration (Optional - for welcome emails)
-EMAIL_SERVICE=gmail
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
-FRONTEND_URL=http://localhost:5173
+SEED_ALLOW_RESET=true
+SEED_ADMIN_EMAIL=admin@example.test
+SEED_ADMIN_PASSWORD=<a-unique-password-at-least-12-characters>
+SEED_STUDENT_EMAIL=student@coursemaster.com
+SEED_STUDENT_PASSWORD=<a-different-unique-password-at-least-12-characters>
 ```
 
-**Required Variables:**
-- `PORT` - Server port (default: 5000)
-- `MONGODB_URI` - MongoDB connection string (required)
-- `JWT_SECRET` - Secret key for JWT token generation (required)
+Then run:
 
-**Optional Variables:**
-- `NODE_ENV` - Environment mode (development/production)
-- `ADMIN_REGISTRATION_KEY` - Secret key for admin account registration (optional)
-  - If set, users can register as admin by providing this key during registration
-  - If not set, admin registration via key is disabled
-  - Admins can still be created manually in the database
-- `EMAIL_SERVICE` - Email service provider (gmail, smtp, etc.)
-- `EMAIL_USER` - Email address for sending welcome emails
-- `EMAIL_PASSWORD` - Email password or app password
-- `FRONTEND_URL` - Frontend URL for email links
-
-**Note for Email Setup:**
-- For Gmail, you need to:
-  1. Enable 2-Factor Authentication
-  2. Generate an App Password (not your regular password)
-  3. Use the App Password in `EMAIL_PASSWORD`
-- If email is not configured, the app will still work but won't send welcome emails
-
-## API Documentation
-
-Base URL: `http://localhost:5000/api/api`
-
-### Authentication Endpoints
-
-#### Register
-- **POST** `/api/auth/register`
-- **Body:**
-  ```json
-  {
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "password123",
-    "adminKey": "optional-admin-key" 
-  }
-  ```
-- **Response:** User object with token
-- **Note:** 
-  - By default, users are registered as "student"
-  - To register as "admin", provide a valid `adminKey` that matches `ADMIN_REGISTRATION_KEY` in environment variables
-  - If invalid admin key is provided, registration will fail
-
-#### Login
-- **POST** `/api/auth/login`
-- **Body:**
-  ```json
-  {
-    "email": "john@example.com",
-    "password": "password123"
-  }
-  ```
-- **Response:** User object with token
-
-#### Get Current User
-- **GET** `/api/auth/me`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** User object
-
-### Course Endpoints (Public)
-
-#### Get All Courses
-- **GET** `/api/courses`
-- **Query Parameters:**
-  - `page` - Page number (default: 1)
-  - `limit` - Items per page (default: 8)
-  - `search` - Search by title or instructor
-  - `sort` - Sort by price: `price_asc` or `price_desc`
-  - `category` - Filter by category
-  - `tags` - Filter by tags (comma-separated)
-- **Response:** Paginated courses list
-
-#### Get Course by ID
-- **GET** `/api/courses/:id`
-- **Response:** Course object with full details
-
-### Enrollment Endpoints (Protected - Student)
-
-#### Enroll in Course
-- **POST** `/api/enrollments/:courseId`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body (optional):**
-  ```json
-  {
-    "batchId": "batch-id-here"
-  }
-  ```
-- **Response:** Enrollment object
-
-#### Get My Enrollments
-- **GET** `/api/enrollments/my`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** Array of enrollment objects
-
-#### Mark Lesson as Complete
-- **PATCH** `/api/enrollments/:enrollId/complete-lesson`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body:**
-  ```json
-  {
-    "lessonId": "lesson-id-here"
-  }
-  ```
-- **Response:** Updated enrollment object
-
-### Assignment Endpoints (Protected - Student)
-
-#### Submit Assignment
-- **POST** `/api/assignments/submit`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body:**
-  ```json
-  {
-    "courseId": "course-id",
-    "lessonId": "lesson-id",
-    "answer": "Answer text or Google Drive link",
-    "answerType": "text" // or "link"
-  }
-  ```
-- **Response:** Assignment submission object
-
-#### Get My Submissions
-- **GET** `/api/assignments/my`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** Array of assignment submissions
-
-### Quiz Endpoints (Protected - Student)
-
-#### Submit Quiz
-- **POST** `/api/quizzes/submit`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body:**
-  ```json
-  {
-    "courseId": "course-id",
-    "lessonId": "lesson-id",
-    "answers": [0, 1, 2, 0] // Array of selected option indices
-  }
-  ```
-- **Response:**
-  ```json
-  {
-    "total": 4,
-    "score": 3,
-    "percent": 75
-  }
-  ```
-
-### Admin Endpoints (Protected - Admin Only)
-
-#### Create Course
-- **POST** `/api/admin/courses`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body:** See Course Schema below
-- **Response:** Created course object
-
-#### Update Course
-- **PATCH** `/api/admin/courses/:id`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body:** Course fields to update
-- **Response:** Updated course object
-
-#### Delete Course
-- **DELETE** `/api/admin/courses/:id`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** Success message
-
-#### Get All Enrollments
-- **GET** `/api/admin/enrollments`
-- **Headers:** `Authorization: Bearer <token>`
-- **Query Parameters:**
-  - `courseId` - Filter by course
-  - `batchId` - Filter by batch
-- **Response:** Array of enrollment objects
-
-#### Get All Assignments
-- **GET** `/api/admin/assignments`
-- **Headers:** `Authorization: Bearer <token>`
-- **Response:** Array of assignment submissions
-
-#### Get Analytics
-- **GET** `/api/admin/analytics`
-- **Headers:** `Authorization: Bearer <token>` (Admin only)
-- **Response:** Analytics data including:
-  - Chart data for enrollments over last 30 days
-  - Top courses by enrollments
-  - Platform statistics (total enrollments, courses, students, instructors)
-
-#### Review Assignment
-- **PATCH** `/api/admin/assignments/:id/review`
-- **Headers:** `Authorization: Bearer <token>`
-- **Body:**
-  ```json
-  {
-    "status": "reviewed",
-    "reviewNotes": "Great work!",
-    "grade": 95
-  }
-  ```
-- **Response:** Updated assignment submission
-
-## Data Models
-
-### Course Schema
-```javascript
-{
-  title: String (required, indexed),
-  description: String (required),
-  instructorName: String (required, indexed),
-  price: Number (required),
-  category: String (indexed),
-  tags: [String] (indexed),
-  syllabus: [{
-    title: String (required),
-    lessons: [{
-      title: String (required),
-      videoUrl: String (required),
-      assignmentPrompt: String,
-      quiz: [{
-        question: String,
-        options: [String],
-        correctIndex: Number
-      }]
-    }]
-  }],
-  batches: [{
-    name: String,
-    startDate: Date
-  }]
-}
+```sh
+npm run seed
 ```
 
-### User Schema
-```javascript
-{
-  name: String (required),
-  email: String (required, unique),
-  passwordHash: String (required),
-  role: String (enum: ["student", "admin"], default: "student")
-}
+Use the credentials you set in `.env` to sign in. The seed script does not print passwords. Do not use a production database, real user data, or these sample accounts on a public deployment. Keep `SEED_ALLOW_RESET=false` after seeding.
+
+## Test
+
+Run the automated regression tests:
+
+```sh
+npm test
 ```
 
-### Enrollment Schema
-```javascript
-{
-  student: ObjectId (ref: User),
-  course: ObjectId (ref: Course),
-  batchId: ObjectId,
-  progress: {
-    completedLessons: [ObjectId],
-    percent: Number (default: 0)
-  }
-}
+The test suite covers password verification, admin registration-key checks, JWT and banned-user handling, enrollment ownership and creation, public quiz-answer filtering, quiz scoring, and seed safety.
+
+## Authentication and roles
+
+- Register with `POST /api/auth/register`. New accounts are students by default.
+- Admin registration is disabled unless `ADMIN_REGISTRATION_KEY` is set. To create an admin through registration, provide the matching `adminKey`; a caller-supplied `role` is never trusted.
+- Sign in with `POST /api/auth/login`; include the returned JWT on requests to protected endpoints.
+- Protected requests verify the token and current user record. Banned or deleted users are rejected, and role changes take effect for existing tokens.
+
+Example:
+
+```sh
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Student","email":"student@example.com","password":"replace-this-password"}'
 ```
 
-## Error Handling
+```sh
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"student@example.com","password":"replace-this-password"}'
+```
 
-All errors follow this format:
+## API reference
+
+All request and response bodies use JSON unless otherwise noted. Protected routes require a bearer token. Admin routes require a current admin account.
+
+### Authentication
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | Public | Create a student; optionally create an admin with the configured `adminKey`. |
+| `POST` | `/api/auth/login` | Public | Verify credentials and return a JWT. |
+| `GET` | `/api/auth/me` | Signed in | Return the current user's profile. |
+
+Registration body:
+
 ```json
 {
-  "message": "Error message here"
+  "name": "Test Student",
+  "email": "student@example.com",
+  "password": "replace-this-password"
 }
 ```
 
-Common HTTP Status Codes:
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request
-- `401` - Unauthorized
-- `403` - Forbidden
-- `404` - Not Found
-- `500` - Internal Server Error
+For configured admin registration, add `"adminKey": "<ADMIN_REGISTRATION_KEY>"`. Passwords must be at least six characters; use a much stronger password outside local testing.
 
-## Bonus Features
+### Courses
 
-### Email Notifications
-- Welcome emails are automatically sent to new users upon registration
-- Uses Nodemailer for email delivery
-- Configure email settings in `.env` file
-- Email sending is non-blocking (won't fail registration if email fails)
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/courses` | Public | List courses. Supports `page`, `limit`, `search`, `sort=price_asc\|price_desc`, `category`, and comma-separated `tags`. |
+| `GET` | `/api/courses/:id` | Public | Get one course. |
+| `POST` | `/api/admin/courses` | Admin | Create a course. |
+| `PATCH` | `/api/admin/courses/:id` | Admin | Update a course. |
+| `DELETE` | `/api/admin/courses/:id` | Admin | Delete a course. |
 
-### Analytics Dashboard
-- Admin analytics dashboard with enrollment trends
-- Charts showing enrollments over the last 30 days
-- Top courses by enrollment statistics
-- Platform-wide statistics (total enrollments, courses, students, instructors)
-- Accessible at `/admin/analytics` (admin only)
+Public course responses omit quiz `correctIndex` values. Correct answers are used only by the server when grading quiz submissions.
 
-## Admin Registration
+### Enrollments
 
-Admins can be created in two ways:
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/enrollments/:courseId` | Signed in | Enroll the current user; optional body: `{"batchId":"<batch-id>"}`. |
+| `GET` | `/api/enrollments/my` | Signed in | List the current user's enrollments. |
+| `PATCH` | `/api/enrollments/:enrollId/complete-lesson` | Signed in | Mark a lesson complete; body: `{"lessonId":"<lesson-id>"}`. Only the enrollment owner can update progress. |
 
-1. **Registration Key Method (Recommended)**:
-   - Set `ADMIN_REGISTRATION_KEY` in your `.env` file
-   - During registration, provide the admin key in the registration form
-   - If the key matches, the user will be created as "admin"
-   - If the key is invalid or missing, registration will fail or create a student account
+### Assignments
 
-2. **Manual Database Method**:
-   - Create admin users directly in the database
-   - Set the `role` field to "admin" in the User document
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/assignments/submit` | Signed in | Submit `{ "courseId", "lessonId", "answerType": "text"\|"link", "answer" }` for an enrolled course. |
+| `GET` | `/api/assignments/my` | Signed in | List the current user's submissions; optional `courseId` query. |
+| `GET` | `/api/assignments/stats?courseId=:id` | Signed in | Get submission and grading statistics for the current user. |
+| `GET` | `/api/admin/assignments` | Admin | List submissions; optional `courseId` query. |
+| `PATCH` | `/api/admin/assignments/:id/review` | Admin | Review a submission with `reviewNotes`, `grade`, and/or `status`. |
 
-**Note**: If `ADMIN_REGISTRATION_KEY` is not set in `.env`, admin registration via key is disabled for security.
+### Quizzes
 
-## Security Features
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/quizzes/submit` | Signed in | Submit `{ "courseId", "lessonId", "answers": [0, 2] }` for an enrolled course. |
+| `GET` | `/api/quizzes/my` | Signed in | List the current user's quiz submissions; optional `courseId` query. |
+| `GET` | `/api/quizzes/stats?courseId=:id` | Signed in | Get the latest score per lesson and course average. |
 
-- Password hashing with bcrypt
-- JWT token-based authentication
-- Protected routes with middleware
-- Admin-only routes with role checking
-- Admin registration key protection
-- Input validation with Zod
-- CORS enabled
+### Administration and users
 
-## Database Indexing
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/admin/enrollments` | Admin | List enrollments; optional `courseId` and `batchId` filters. |
+| `GET` | `/api/admin/analytics` | Admin | Get enrollment and platform statistics. |
+| `GET` | `/api/users` | Admin | List users without password hashes. |
+| `PATCH` | `/api/users/:id/role` | Admin | Change a user's role (`student` or `admin`). |
+| `PATCH` | `/api/users/:id/ban` | Admin | Toggle a user's banned state. |
+| `DELETE` | `/api/users/:id` | Admin | Delete a user. |
 
-The following fields are indexed for performance:
-- Course: `title`, `instructorName`, `category`, `tags`
-- Enrollment: `{student: 1, course: 1}` (unique compound index)
+## Environment variables
 
-## Deployment
+| Variable | Required | Description |
+|---|---|---|
+| `MONGODB_URI` (or `MONGO_URI`) | Yes | MongoDB connection string. |
+| `JWT_SECRET` | Yes | Long, random secret used to sign and verify tokens. |
+| `PORT` | No | HTTP port; defaults to `5000`. |
+| `NODE_ENV` | No | Use `development` locally and `production` for production. |
+| `ADMIN_REGISTRATION_KEY` | No | Enables admin signup only when a matching `adminKey` is supplied. |
+| `EMAIL_SERVICE`, `EMAIL_USER`, `EMAIL_PASSWORD` | No | Optional Nodemailer welcome-email settings. |
+| `FRONTEND_URL` | No | Frontend URL included in welcome emails. |
+| `SEED_ALLOW_RESET` | Seed only | Must be `true` to confirm database reset; never enable in production. |
+| `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_STUDENT_PASSWORD` | Seed only | Required seed-account settings; passwords must be at least 12 characters. |
+| `SEED_STUDENT_EMAIL` | No | Seed student email; defaults to `student@coursemaster.com`. |
 
-The backend is deployed on **Vercel**. Make sure to set all environment variables in your deployment platform.
+## Deployment notes
 
-## Development
+Set `MONGODB_URI` and a strong `JWT_SECRET` in the deployment platform's secret/environment settings. Configure optional email settings as needed. Never configure the seed reset flag or run the seed command against production data. The project includes a Vercel serverless entry point in `api/index.js`.
 
-- Development server runs on `http://localhost:5000` (default)
-- Uses `nodemon` for auto-restart during development
-- MongoDB connection is handled via Mongoose
+## Project layout
 
+```text
+api/                 Vercel serverless entry point
+src/config/          Database connection
+src/controllers/     HTTP controllers
+src/middlewares/     Authentication, validation, and errors
+src/models/          Mongoose models
+src/routes/          Express route definitions
+src/services/        Application logic
+src/validators/      Zod request schemas
+test/                Automated regression tests
+```

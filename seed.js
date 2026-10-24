@@ -2,6 +2,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const connectDB = require("./src/config/db");
 const User = require("./src/models/User");
 const Course = require("./src/models/Course");
@@ -9,8 +10,42 @@ const Enrollment = require("./src/models/Enrollment");
 const QuizSubmission = require("./src/models/QuizSubmission");
 const AssignmentSubmission = require("./src/models/AssignmentSubmission");
 
+const validateSeedConfiguration = () => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("The seed script cannot run when NODE_ENV is production");
+  }
+  if (process.env.SEED_ALLOW_RESET !== "true") {
+    throw new Error("Set SEED_ALLOW_RESET=true to confirm this destructive seed operation");
+  }
+
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  const databaseName = uri && uri.split("?")[0].slice(uri.lastIndexOf("/") + 1);
+  if (!databaseName || !/(?:_test|-test|_demo|-demo)$/i.test(databaseName)) {
+    throw new Error("The seed script only runs against a database ending in _test or _demo");
+  }
+
+  const requiredValues = [
+    ["SEED_ADMIN_EMAIL", process.env.SEED_ADMIN_EMAIL],
+    ["SEED_ADMIN_PASSWORD", process.env.SEED_ADMIN_PASSWORD],
+    ["SEED_STUDENT_PASSWORD", process.env.SEED_STUDENT_PASSWORD],
+  ];
+  const missing = requiredValues
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (missing.length > 0) {
+    throw new Error(`Missing required seed settings: ${missing.join(", ")}`);
+  }
+  if (
+    process.env.SEED_ADMIN_PASSWORD.length < 12 ||
+    process.env.SEED_STUDENT_PASSWORD.length < 12
+  ) {
+    throw new Error("Seed passwords must be at least 12 characters long");
+  }
+};
+
 const seedDatabase = async () => {
   try {
+    validateSeedConfiguration();
     console.log("Connecting to Database...");
     await connectDB();
 
@@ -22,19 +57,19 @@ const seedDatabase = async () => {
     await AssignmentSubmission.deleteMany({});
 
     console.log("Seeding Users...");
-    const hashedPassword = await bcrypt.hash("admin123", 10);
-    const studentPassword = await bcrypt.hash("student123", 10);
+    const hashedPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD, 10);
+    const studentPassword = await bcrypt.hash(process.env.SEED_STUDENT_PASSWORD, 10);
 
     const adminUser = await User.create({
       name: "Super Admin",
-      email: process.env.ADMIN_EMAIL || "admin@coursemaster.com",
+      email: process.env.SEED_ADMIN_EMAIL,
       passwordHash: hashedPassword,
       role: "admin",
     });
 
     const student1 = await User.create({
       name: "Rahim Chowdhury",
-      email: "student@coursemaster.com",
+      email: process.env.SEED_STUDENT_EMAIL || "student@coursemaster.com",
       passwordHash: studentPassword,
       role: "student",
     });
@@ -244,18 +279,23 @@ const seedDatabase = async () => {
     console.log("-----------------------------------------");
     console.log("Admin Account:");
     console.log(`Email: ${adminUser.email}`);
-    console.log("Password: admin123");
+    console.log("Password: use SEED_ADMIN_PASSWORD from your local environment");
     console.log("-----------------------------------------");
     console.log("Student Account:");
     console.log(`Email: ${student1.email}`);
-    console.log("Password: student123");
+    console.log("Password: use SEED_STUDENT_PASSWORD from your local environment");
     console.log("-----------------------------------------");
 
-    process.exit(0);
+    await mongoose.disconnect();
   } catch (error) {
     console.error("Seeding Error:", error);
-    process.exit(1);
+    await mongoose.disconnect();
+    process.exitCode = 1;
   }
 };
 
-seedDatabase();
+if (require.main === module) {
+  seedDatabase();
+}
+
+module.exports = { seedDatabase, validateSeedConfiguration };
